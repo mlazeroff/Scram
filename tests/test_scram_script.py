@@ -71,7 +71,7 @@ class TestArguments:
         assert args.format == 'hex'
 
     def test_input_mutual_exclusion(self):
-        proc_data = subprocess.run(['py', scrammer.__file__, 'hello', '-f', 'hi.txt'], stderr=PIPE)
+        proc_data = subprocess.run([PYTHON_CMD, scrammer.__file__, 'hello', '-f', 'hi.txt'], stderr=PIPE)
         assert proc_data.returncode != 0 and proc_data.stderr != b''
 
     def test_output_file_flag_true(self):
