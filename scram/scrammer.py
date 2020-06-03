@@ -134,7 +134,7 @@ def main(args=None):
 
 
 def parse_args(args):
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='A SCRAM-SHA1 tool.')
     input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument('plaintext', help='data fed to SCRAM-SHA1', nargs='?')
     input_group.add_argument('-f', '--file', help='input file', dest='input_file')
