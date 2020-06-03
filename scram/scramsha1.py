@@ -17,7 +17,7 @@ def SCRAMSHA1(plaintext: bytes, salt: str, iterations: int):
         raise TypeError('Expected bytes type')
 
     try:
-        salt = b64decode(salt)
+        salt = b64decode(salt, validate=True)
     except Exception as e:
         raise ValueError('Invalid salt: {}'.format(e))
 

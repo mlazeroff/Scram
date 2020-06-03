@@ -87,6 +87,37 @@ def file_mode(args):
     output_data(data, file=args.output_file)
 
 
+def stdin_mode(args):
+    salt = args.salt
+    needs_salt = True if salt is None else False
+    data = []
+    try:
+        while True:
+            content = input()
+            if content == '':
+                break
+            plaintext = content.strip().encode('utf8')
+            if needs_salt:
+                salt = gen_salt(HASH_LEN)
+            iterations = args.iterations
+            hash_res = SCRAMSHA1(plaintext, salt, iterations)
+            final = hash_format(hash_res, salt, iterations, mode=args.format)
+            if args.output_file is None:
+                output_data([final])
+            else:
+                data.append(final)
+    except EOFError:
+        pass
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(e, file=sys.stderr)
+    finally:
+        if args.output_file:
+            with open(args.output_file, 'w') as file:
+                output_data(data, file=file)
+
+
 def main(args=None):
     if args is None:
         args = parse_args(sys.argv[1:])
@@ -99,8 +130,7 @@ def main(args=None):
     elif args.input_file is not None:
         file_mode(args)
     else:
-        print('Please provide input data or data file', file=sys.stderr)
-        exit(1)
+        stdin_mode(args)
 
 
 def parse_args(args):
