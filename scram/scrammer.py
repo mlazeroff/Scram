@@ -66,8 +66,8 @@ def single_mode(args):
 
     hash_res = SCRAMSHA1(plaintext, salt, iterations)
     data = [hash_format(hash_res, salt, iterations, mode=args.format)]
-    # TODO: add file output
-    output_data(data)
+
+    output_data(data, file=args.output_file)
 
 
 def file_mode(args):
@@ -83,8 +83,8 @@ def file_mode(args):
             iterations = args.iterations
             hash_res = SCRAMSHA1(plaintext, salt, iterations)
             data.append(hash_format(hash_res, salt, iterations, mode=args.format))
-    # TODO: add file output
-    output_data(data)
+
+    output_data(data, file=args.output_file)
 
 
 def main(args=None):
@@ -112,6 +112,7 @@ def parse_args(args):
                         type=str, metavar='salt', dest='salt')
     parser.add_argument('-i', '--iter', help='iteration count', default=4096,
                         type=int, metavar='iterations', dest='iterations')
+    parser.add_argument('-o', help='output file', type=str, metavar='output_file', dest='output_file')
     parser.add_argument('--format', '-fmt', choices=OUTPUT_FORMATS, help='output format',
                         default='hex', dest='format')
     args = parser.parse_args(args)

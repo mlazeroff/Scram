@@ -70,6 +70,14 @@ class TestArguments:
         proc_data = subprocess.run(['py', scrammer.__file__, 'hello', '-f', 'hi.txt'], capture_output=True)
         assert proc_data.returncode != 0 and proc_data.stderr != b''
 
+    def test_output_file_flag_true(self):
+        args = scrammer.parse_args(['hello', '-o', 'hi.txt'])
+        assert args.output_file == 'hi.txt'
+
+    def test_no_output_file_flag(self):
+        args = scrammer.parse_args(['hello'])
+        assert args.output_file is None
+
 
 class TestHashFormat:
     HASH = bytes.fromhex('e9d94660c39d65c38fbad91c358f14da0eef2bd6')
@@ -84,7 +92,48 @@ class TestHashFormat:
         assert result == output
 
 
-class TestOutput:
+class TestOutputFunction:
+
+    def test_output_single_hash_to_file(self, tmp_path):
+        fp = tmp_path / 'test.txt'
+        with open(fp, 'w') as file:
+            data = ['e9d94660c39d65c38fbad91c358f14da0eef2bd6']
+            scrammer.output_data(data, file=file)
+        with open(fp) as file:
+            file_data = file.readline().strip()
+
+        assert data[0] == file_data
+
+    def test_output_multiple_hashes_to_file(self, tmp_path):
+        fp = tmp_path / 'multiple.txt'
+        with open(fp, 'w') as file:
+            data = ['c89a8efabda245d57e178bbf1b23a0fb282301f7', '7bcc94a7fad21b166a46ea5f6e7ace3a53f83583',
+                    '1907d2a38a46200722a30e9f2c3c20edf20a051e', 'd63705b127777e7aa8ace460a5aa1c6a91051a55',
+                    '29a7bca35ab4817e9460506912c1d3e69c8efcb0']
+            scrammer.output_data(data, file=file)
+        with open(fp) as file:
+            for ind, line in enumerate(file):
+                line = line.strip()
+                assert line == data[ind]
+
+    def test_output_single_hash_to_stdout(self, capsys):
+        data = ['e9d94660c39d65c38fbad91c358f14da0eef2bd6']
+        scrammer.output_data(data)
+        captured = capsys.readouterr()
+        assert captured.out.strip() == data[0]
+
+    def test_output_multiple_hashes_to_stdout(self, capsys):
+        data = ['c89a8efabda245d57e178bbf1b23a0fb282301f7', '7bcc94a7fad21b166a46ea5f6e7ace3a53f83583',
+                '1907d2a38a46200722a30e9f2c3c20edf20a051e', 'd63705b127777e7aa8ace460a5aa1c6a91051a55',
+                '29a7bca35ab4817e9460506912c1d3e69c8efcb0']
+        scrammer.output_data(data)
+        captured = capsys.readouterr()
+        for ind, line in enumerate(captured.out.split('\n')):
+            if line != '':
+                assert line.strip() == data[ind]
+
+
+class TestScriptOutput:
     RUN_ARGS = ['py', scrammer.__file__]
 
     def test_pencil_scram(self):
@@ -116,13 +165,13 @@ class TestOutput:
         assert proc_data.stdout.strip() == b'6dlGYMOdZcOPutkcNY8U2g7vK9Y='
 
     def test_small_dictionary(self):
-        scrammer_args = ['-f', 'resource/small_dictionary.txt', '-s', '1234', '--format', 'hex']
+        scrammer_args = ['-f', 'resources/small_dictionary.txt', '-s', '1234', '--format', 'hex']
         args = self.RUN_ARGS + scrammer_args
         proc_data = subprocess.run(args, capture_output=True)
         correct = [b'c89a8efabda245d57e178bbf1b23a0fb282301f7', b'7bcc94a7fad21b166a46ea5f6e7ace3a53f83583',
                    b'1907d2a38a46200722a30e9f2c3c20edf20a051e', b'd63705b127777e7aa8ace460a5aa1c6a91051a55',
                    b'29a7bca35ab4817e9460506912c1d3e69c8efcb0']
+        data = proc_data.stdout
         for ind, line in enumerate(proc_data.stdout.split()):
             line = line.strip()
             assert line == correct[ind]
-
