@@ -9,6 +9,7 @@ OUTPUT_SWITCHES = ['-hc', '-b64']
 
 RESOURCES = Path(__file__).parent / 'resources'
 
+
 class TestArguments:
     ONLY_PLAINTEXT = ['hello']
 
