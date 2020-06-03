@@ -88,7 +88,7 @@ def file_mode(args):
 
 
 def main(args=None):
-    if args is not None:
+    if args is None:
         args = parse_args(sys.argv[1:])
     else:
         args = parse_args(args)
