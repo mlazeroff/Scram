@@ -1,5 +1,8 @@
+from base64 import b64decode
 import pytest
+import pytest_mock
 import subprocess
+import os
 from scram import scrammer
 
 OUTPUT_SWITCHES = ['-hc', '-b64']
@@ -48,10 +51,6 @@ class TestArguments:
         args = scrammer.parse_args(['hello', '--format', 'b64'])
         assert args.format == 'b64'
 
-    def test_missing_plaintext(self):
-        proc_data = subprocess.run(['py', scrammer.__file__], capture_output=True)
-        assert proc_data.returncode != 0 and proc_data.stderr != b''
-
     @pytest.mark.parametrize('arg', ['plaintext', 'salt', 'iterations', 'format', 'input_file'])
     def test_arg_in_arg_namespace(self, arg):
         args = scrammer.parse_args(self.ONLY_PLAINTEXT)
@@ -90,6 +89,81 @@ class TestHashFormat:
     def test_output(self, mode, output):
         result = scrammer.hash_format(self.HASH, self.SALT, self.ITERATIONS, mode)
         assert result == output
+
+    def test_not_a_format(self):
+        with pytest.raises(ValueError):
+            scrammer.hash_format(b'', '', 20, mode='fake')
+
+
+class TestModes:
+    SALT = '1234'
+
+    def test_gen_salt(self):
+        salt = scrammer.gen_salt(20)
+        assert isinstance(salt, str)
+        # ensure salt decodes
+        stuff = b64decode(salt, validate=True)
+
+    def test_single_mode_gen_salt(self, mocker):
+        mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
+        scrammer.main(['hello'])
+        assert mocked_salter.call_count == 1
+
+    def test_single_mode_no_gen_salt(self, mocker):
+        mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
+        scrammer.main(['hello', '-s', self.SALT])
+        assert mocked_salter.call_count == 0
+
+    def test_file_mode_gen_salt(self, mocker):
+        mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
+        scrammer.main(['-f', 'resources/small_dictionary.txt'])
+        assert mocked_salter.call_count == len(TestScriptOutput.SMALL_DICT_HEX)
+
+    def test_file_mode_no_gen_salt(self, mocker):
+        mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
+        scrammer.main(['-f', 'resources/small_dictionary.txt', '-s', '1234'])
+        assert mocked_salter.call_count == 0
+
+    def test_one_stdin_mode_gen_salt(self, mocker):
+        mocker.patch('scram.scrammer.input', side_effect=['pencil', ''])
+        mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
+        scrammer.main([])
+        assert mocked_salter.call_count == 1
+
+    def test_multi_stdin_mode_gen_salt(self, mocker):
+        mocker.patch('scram.scrammer.input', side_effect=['pencil'] * 10 + [''])
+        mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
+        scrammer.main([])
+        assert mocked_salter.call_count == 10
+
+    def test_one_stdin_mode_no_gen_salt(self, mocker):
+        mocker.patch('scram.scrammer.input', side_effect=['pencil', ''])
+        mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
+        scrammer.main(['-s', '1234'])
+        assert mocked_salter.call_count == 0
+
+    def test_multi_stdin_mode_no_gen_salt(self, mocker):
+        mocker.patch('scram.scrammer.input', side_effect=['pencil'] * 10 + [''])
+        mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
+        scrammer.main(['-s', '1234'])
+        assert mocked_salter.call_count == 0
+
+    def test_stdin_eof(self, mocker):
+        mock = mocker.patch('scram.scrammer.input', side_effect=EOFError('eof'))
+        scrammer.main([])
+        assert mock.call_count == 1
+
+    def test_stdin_keyboard_interrupt(self, mocker):
+        mock = mocker.patch('scram.scrammer.input', side_effect=KeyboardInterrupt('inter'))
+        scrammer.main([])
+        assert mock.call_count == 1
+
+    def test_stdin_random_error(self, mocker, capsys):
+        mock = mocker.patch('scram.scrammer.input', side_effect=TypeError('random'))
+        scrammer.main([])
+        assert mock.call_count == 1
+        captured = capsys.readouterr().err
+        assert captured.strip() == 'random'
 
 
 class TestOutputFunction:
@@ -135,6 +209,12 @@ class TestOutputFunction:
 
 class TestScriptOutput:
     RUN_ARGS = ['py', scrammer.__file__]
+    PENCIL_SALT = 'QSXCR+Q6sek8bf92'
+    PENCIL_HEX = 'e9d94660c39d65c38fbad91c358f14da0eef2bd6'
+    SMALL_DICT_SALT = '1234'
+    SMALL_DICT_HEX = ['c89a8efabda245d57e178bbf1b23a0fb282301f7', '7bcc94a7fad21b166a46ea5f6e7ace3a53f83583',
+                      '1907d2a38a46200722a30e9f2c3c20edf20a051e', 'd63705b127777e7aa8ace460a5aa1c6a91051a55',
+                      '29a7bca35ab4817e9460506912c1d3e69c8efcb0']
 
     def test_pencil_scram(self, capsys):
         args = ['pencil', '-s', 'QSXCR+Q6sek8bf92']
@@ -178,3 +258,58 @@ class TestScriptOutput:
         for ind, line in enumerate(out.split()):
             line = line.strip()
             assert line == correct[ind]
+
+    def test_stdin_pencil_to_stdout(self, mocker, capsys):
+        mocked_input = mocker.patch('scram.scrammer.input')
+        mocked_input.side_effect = ['pencil', '']
+        scrammer.main(['-s', self.PENCIL_SALT])
+        assert mocked_input.call_count == 2
+        out = capsys.readouterr().out
+        line = out.split()[0]
+        assert line == self.PENCIL_HEX
+
+    def test_stdin_pencil_to_file(self, mocker, tmp_path):
+        mocked_input = mocker.patch('scram.scrammer.input')
+        mocked_input.side_effect = ['pencil', '']
+        file = tmp_path / 'stdin_one.txt'
+        scrammer.main(['-s', self.PENCIL_SALT, '-o', str(file)])
+        assert os.path.exists(file)
+        with open(file) as content:
+            line = content.read().split()[0]
+            assert line == self.PENCIL_HEX
+
+    def test_stdin_multiple_to_stdout(self, mocker, capsys):
+        """
+        tests for interactive input
+        """
+        mocked_input = mocker.patch('scram.scrammer.input')
+        mocked_input.side_effect = ['pencil', 'pencil', '']
+        scrammer.main(['-s', self.PENCIL_SALT])
+        assert mocked_input.call_count == 3
+        captured = capsys.readouterr()
+        out = captured.out
+        lines = [line for line in out.split() if line != '']
+        for line in lines:
+            assert line == self.PENCIL_HEX
+
+    def test_stdin_small_dictionary_to_stdout(self, capsys):
+        with open('resources/small_dictionary.txt', encoding='utf8') as file:
+            content = file.read()
+        args = self.RUN_ARGS + ['-s', self.SMALL_DICT_SALT]
+        proc_data = subprocess.run(args, capture_output=True, shell=True, input=content, encoding='utf8')
+        out = proc_data.stdout
+        lines = [(ind, line) for ind, line in enumerate(out.split()) if line != '']
+        for ind, line in lines:
+            assert line == self.SMALL_DICT_HEX[ind]
+
+    def test_stdin_small_dictionary_to_file(self, tmp_path):
+        with open('resources/small_dictionary.txt', encoding='utf8') as file:
+            content = file.read()
+        file = tmp_path / 'dict_to_file.txt'
+        args = self.RUN_ARGS + ['-s', self.SMALL_DICT_SALT, '-o', str(file)]
+        proc_data = subprocess.run(args, shell=True, input=content, encoding='utf8')
+        assert os.path.exists(file)
+        with open(file) as content:
+            lines = [(ind, line.strip()) for ind, line in enumerate(content) if line != '']
+            for ind, line in lines:
+                assert line == self.SMALL_DICT_HEX[ind]
