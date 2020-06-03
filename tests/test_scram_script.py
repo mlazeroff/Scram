@@ -1,12 +1,13 @@
 from base64 import b64decode
+from pathlib import Path
 import pytest
-import pytest_mock
 import subprocess
 import os
 from scram import scrammer
 
 OUTPUT_SWITCHES = ['-hc', '-b64']
 
+RESOURCES = Path(__file__).parent / 'resources'
 
 class TestArguments:
     ONLY_PLAINTEXT = ['hello']
@@ -116,12 +117,14 @@ class TestModes:
 
     def test_file_mode_gen_salt(self, mocker):
         mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
-        scrammer.main(['-f', 'resources/small_dictionary.txt'])
+        file_path = RESOURCES / 'small_dictionary.txt'
+        scrammer.main(['-f', str(file_path)])
         assert mocked_salter.call_count == len(TestScriptOutput.SMALL_DICT_HEX)
 
     def test_file_mode_no_gen_salt(self, mocker):
         mocked_salter = mocker.patch('scram.scrammer.gen_salt', return_value=self.SALT)
-        scrammer.main(['-f', 'resources/small_dictionary.txt', '-s', '1234'])
+        file_path = RESOURCES / 'small_dictionary.txt'
+        scrammer.main(['-f', str(file_path), '-s', '1234'])
         assert mocked_salter.call_count == 0
 
     def test_one_stdin_mode_gen_salt(self, mocker):
@@ -248,7 +251,8 @@ class TestScriptOutput:
         assert out.strip() == '6dlGYMOdZcOPutkcNY8U2g7vK9Y='
 
     def test_small_dictionary(self, capsys):
-        scrammer_args = ['-f', 'resources/small_dictionary.txt', '-s', '1234', '--format', 'hex']
+        file_path = RESOURCES / 'small_dictionary.txt'
+        scrammer_args = ['-f', str(file_path), '-s', '1234', '--format', 'hex']
         scrammer.main(scrammer_args)
         captured = capsys.readouterr()
         out = captured.out
@@ -293,7 +297,8 @@ class TestScriptOutput:
             assert line == self.PENCIL_HEX
 
     def test_stdin_small_dictionary_to_stdout(self, capsys):
-        with open('resources/small_dictionary.txt', encoding='utf8') as file:
+        file_path = RESOURCES / 'small_dictionary.txt'
+        with open(file_path, encoding='utf8') as file:
             content = file.read()
         args = self.RUN_ARGS + ['-s', self.SMALL_DICT_SALT]
         proc_data = subprocess.run(args, capture_output=True, shell=True, input=content, encoding='utf8')
@@ -303,7 +308,9 @@ class TestScriptOutput:
             assert line == self.SMALL_DICT_HEX[ind]
 
     def test_stdin_small_dictionary_to_file(self, tmp_path):
-        with open('resources/small_dictionary.txt', encoding='utf8') as file:
+
+        file_path = RESOURCES / 'small_dictionary.txt'
+        with open(file_path, encoding='utf8') as file:
             content = file.read()
         file = tmp_path / 'dict_to_file.txt'
         args = self.RUN_ARGS + ['-s', self.SMALL_DICT_SALT, '-o', str(file)]
@@ -313,3 +320,4 @@ class TestScriptOutput:
             lines = [(ind, line.strip()) for ind, line in enumerate(content) if line != '']
             for ind, line in lines:
                 assert line == self.SMALL_DICT_HEX[ind]
+
