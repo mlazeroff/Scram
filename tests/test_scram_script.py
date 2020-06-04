@@ -1,13 +1,16 @@
 from base64 import b64decode
 from pathlib import Path
 import pytest
+from subprocess import PIPE
 import subprocess
 import os
+import sys
 from scram import scrammer
 
 OUTPUT_SWITCHES = ['-hc', '-b64']
 
 RESOURCES = Path(__file__).parent / 'resources'
+PYTHON_CMD = 'py' if sys.platform == 'win32' else 'python3'
 
 
 class TestArguments:
@@ -68,7 +71,7 @@ class TestArguments:
         assert args.format == 'hex'
 
     def test_input_mutual_exclusion(self):
-        proc_data = subprocess.run(['py', scrammer.__file__, 'hello', '-f', 'hi.txt'], capture_output=True)
+        proc_data = subprocess.run([PYTHON_CMD, scrammer.__file__, 'hello', '-f', 'hi.txt'], stderr=PIPE)
         assert proc_data.returncode != 0 and proc_data.stderr != b''
 
     def test_output_file_flag_true(self):
@@ -212,7 +215,7 @@ class TestOutputFunction:
 
 
 class TestScriptOutput:
-    RUN_ARGS = ['py', scrammer.__file__]
+    RUN_ARGS = [PYTHON_CMD, scrammer.__file__]
     PENCIL_SALT = 'QSXCR+Q6sek8bf92'
     PENCIL_HEX = 'e9d94660c39d65c38fbad91c358f14da0eef2bd6'
     SMALL_DICT_SALT = '1234'
@@ -302,7 +305,8 @@ class TestScriptOutput:
         with open(file_path, encoding='utf8') as file:
             content = file.read()
         args = self.RUN_ARGS + ['-s', self.SMALL_DICT_SALT]
-        proc_data = subprocess.run(args, capture_output=True, shell=True, input=content, encoding='utf8')
+        proc_data = subprocess.run(args, shell=True, input=content, encoding='utf8',
+                                   stdout=PIPE, stderr=PIPE)
         out = proc_data.stdout
         lines = [(ind, line) for ind, line in enumerate(out.split()) if line != '']
         for ind, line in lines:
@@ -315,7 +319,8 @@ class TestScriptOutput:
             content = file.read()
         file = tmp_path / 'dict_to_file.txt'
         args = self.RUN_ARGS + ['-s', self.SMALL_DICT_SALT, '-o', str(file)]
-        proc_data = subprocess.run(args, shell=True, input=content, encoding='utf8')
+        proc_data = subprocess.run(args, input=content, encoding='utf8')
+        assert proc_data.returncode == 0
         assert os.path.exists(file)
         with open(file) as content:
             lines = [(ind, line.strip()) for ind, line in enumerate(content) if line != '']
