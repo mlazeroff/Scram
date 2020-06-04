@@ -9,5 +9,5 @@ jobs:
       python: 3.8
 
 install:
-  - pip install .
+  - pip3 install .
 script: pytest
