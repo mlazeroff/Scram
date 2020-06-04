@@ -319,7 +319,8 @@ class TestScriptOutput:
             content = file.read()
         file = tmp_path / 'dict_to_file.txt'
         args = self.RUN_ARGS + ['-s', self.SMALL_DICT_SALT, '-o', str(file)]
-        proc_data = subprocess.run(args, shell=True, input=content, encoding='utf8')
+        proc_data = subprocess.run(args, input=content, encoding='utf8')
+        assert proc_data.returncode == 0
         assert os.path.exists(file)
         with open(file) as content:
             lines = [(ind, line.strip()) for ind, line in enumerate(content) if line != '']
